@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Collaborative Image Annotation Tool</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="editor-container">
+      <!-- Top Menu Bar -->
+      <div class="menu-bar">
+        <h1>Collaborative Annotation Tool</h1>
+        <div class="menu-group">
+          <button id="saveBtn" class="btn btn-success">
+            💾 Save Annotations
+          </button>
+        </div>
+        <div class="menu-separator"></div>
+        <div class="menu-group">
+          <button id="clearBtn" class="btn btn-danger">🗑️ Clear Boxes</button>
+        </div>
+        <div class="status-item" style="margin-left: auto">
+          <span id="current-image-name">No image loaded</span>
+        </div>
+      </div>
+
+      <!-- Main Layout -->
+      <div class="main-layout">
+        <!-- Left Panel: Image Gallery -->
+        <div class="left-panel">
+          <h3>🖼️ Image Gallery</h3>
+          <div id="image-gallery" class="image-gallery-container">
+            <!-- Images will be loaded here -->
+          </div>
+        </div>
+
+        <!-- Canvas Area -->
+        <div class="canvas-area">
+          <div class="canvas-header">
+            <div class="left-toolbar">
+              <div
+                class="tool-btn active"
+                id="selectTool"
+                title="Select Tool (V)"
+              >
+                🖱️
+              </div>
+              <div class="tool-btn" id="boxTool" title="Box Tool (B)">⬜</div>
+              <div class="tool-btn" id="panTool" title="Pan Tool (H)">✋</div>
+            </div>
+            <div class="zoom-controls">
+              <button class="zoom-btn" id="zoomOut" title="Zoom Out">−</button>
+              <div class="zoom-level" id="zoomLevel">100%</div>
+              <button class="zoom-btn" id="zoomIn" title="Zoom In">+</button>
+              <button class="zoom-btn" id="zoomFit" title="Fit to Window">
+                ⌂
+              </button>
+              <button class="zoom-btn" id="zoomActual" title="Actual Size">
+                1:1
+              </button>
+            </div>
+          </div>
+          <div class="canvas-viewport" id="canvasViewport">
+            <div class="canvas-container">
+              <canvas id="canvas"></canvas>
+              <div class="placeholder-text" id="placeholderText">
+                Please select an image from the gallery to start annotating.
+              </div>
+              <div class="drawing-indicator" id="drawingIndicator">
+                Click two points to create a bounding box.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Panel -->
+        <div class="right-panel">
+          <div class="panel-section">
+            <h3>🎨 Box Properties</h3>
+            <div class="color-picker-group">
+              <div class="color-row">
+                <label>Fill:</label>
+                <input
+                  type="color"
+                  id="fillColor"
+                  class="color-input"
+                  value="#ff0000"
+                />
+              </div>
+              <div class="color-row">
+                <label>Border:</label>
+                <input
+                  type="color"
+                  id="strokeColor"
+                  class="color-input"
+                  value="#000000"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div class="panel-section">
+            <h3>🔧 Actions</h3>
+            <div class="action-buttons">
+              <button id="deleteBtn" class="btn btn-danger">
+                🗑️ Delete Selected
+              </button>
+            </div>
+          </div>
+
+          <div class="panel-section">
+            <h3>📜 Annotation List</h3>
+            <ul id="annotation-list" class="annotation-list">
+              <!-- Annotation items will be populated here -->
+            </ul>
+          </div>
+
+          <div class="panel-section">
+            <h3>ℹ️ Shortcuts</h3>
+            <div class="shortcuts">
+              <p><strong>V</strong> - Select Tool</p>
+              <p><strong>B</strong> - Box Tool</p>
+              <p><strong>H</strong> - Pan Tool</p>
+              <p><strong>Delete</strong> - Delete Selected</p>
+              <p><strong>ESC</strong> - Exit Drawing Mode</p>
+              <p><strong>Ctrl + Wheel</strong> - Zoom</p>
+              <p><strong>Arrow Keys</strong> - Move Object</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Status Bar -->
+      <div class="status-bar">
+        <div class="status-item">
+          <span>Canvas: </span>
+          <span id="canvasSize">N/A</span>
+        </div>
+        <div class="status-item">
+          <span>Zoom: </span>
+          <span id="statusZoom">100%</span>
+        </div>
+        <div class="status-item">
+          <span>Boxes: </span>
+          <span id="objectCount">0</span>
+        </div>
+      </div>
+    </div>
+
+    <script src="client.js"></script>
+  </body>
+</html>

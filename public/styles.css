@@ -1,0 +1,365 @@
+/* General Resets and Body */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  background: #2b2b2b;
+  color: #dcdcdc;
+  overflow: hidden;
+  height: 100vh;
+}
+
+.editor-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+/* Menu Bar */
+.menu-bar {
+  background: #3c3c3c;
+  border-bottom: 1px solid #555;
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  flex-shrink: 0;
+}
+
+.menu-bar h1 {
+  font-size: 16px;
+  color: #ffffff;
+  margin-right: 20px;
+}
+
+.menu-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.menu-separator {
+  width: 1px;
+  height: 20px;
+  background: #555;
+  margin: 0 8px;
+}
+
+/* Main Layout */
+.main-layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Left Panel - Image Gallery */
+.left-panel {
+  background: #3c3c3c;
+  border-right: 1px solid #555;
+  width: 240px;
+  padding: 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.left-panel h3 {
+  font-size: 14px;
+  margin-bottom: 12px;
+  color: #ffffff;
+  border-bottom: 1px solid #666;
+  padding-bottom: 8px;
+  flex-shrink: 0;
+}
+
+.image-gallery-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex-grow: 1;
+  overflow-y: auto;
+}
+
+.gallery-item {
+  cursor: pointer;
+  border: 2px solid transparent;
+  border-radius: 4px;
+  padding: 5px;
+  transition: all 0.2s ease;
+  background: #4a4a4a;
+}
+
+.gallery-item:hover {
+  border-color: #007acc;
+  background: #5a5a5a;
+}
+.gallery-item.active {
+  border-color: #0099ff;
+  background: #007acc;
+}
+
+.gallery-item img {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 2px;
+}
+
+.gallery-item p {
+  font-size: 12px;
+  text-align: center;
+  margin-top: 5px;
+  word-break: break-all;
+}
+
+/* Canvas Area */
+.canvas-area {
+  flex: 1;
+  background: #2b2b2b;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+.canvas-header {
+  background: #3c3c3c;
+  border-bottom: 1px solid #555;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Left Toolbar (moved inside canvas header) */
+.left-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tool-btn {
+  width: 36px;
+  height: 36px;
+  background: #4a4a4a;
+  border: 1px solid #666;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  color: #ffffff;
+  font-size: 16px;
+}
+
+.tool-btn:hover {
+  background: #555;
+  border-color: #777;
+}
+
+.tool-btn.active {
+  background: #007acc;
+  border-color: #0099ff;
+}
+
+.zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.zoom-btn {
+  width: 32px;
+  height: 32px;
+  background: #4a4a4a;
+  border: 1px solid #666;
+  border-radius: 4px;
+  cursor: pointer;
+  color: #fff;
+}
+
+.zoom-btn:hover {
+  background: #555;
+}
+
+.zoom-level {
+  background: #4a4a4a;
+  padding: 4px 8px;
+  min-width: 60px;
+  text-align: center;
+  font-size: 12px;
+}
+
+.canvas-viewport {
+  flex: 1;
+  overflow: auto;
+  background: #404040;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.canvas-container {
+  position: relative;
+  display: inline-block;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+  transition: transform 0.1s ease-out;
+}
+#canvas {
+  display: block;
+}
+
+.placeholder-text {
+  color: #888;
+  font-size: 1.2em;
+}
+
+/* Right Panel */
+.right-panel {
+  background: #3c3c3c;
+  border-left: 1px solid #555;
+  width: 280px;
+  padding: 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.panel-section {
+  margin-bottom: 20px;
+  background: #4a4a4a;
+  border-radius: 6px;
+  padding: 12px;
+}
+.panel-section h3 {
+  font-size: 14px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid #666;
+  padding-bottom: 8px;
+}
+
+.color-picker-group,
+.action-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.color-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.color-row label {
+  font-size: 13px;
+  min-width: 50px;
+}
+.color-input {
+  width: 30px;
+  height: 30px;
+  border: 1px solid #666;
+  border-radius: 4px;
+  cursor: pointer;
+  background: none;
+}
+.shortcuts p {
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* Annotation List */
+.annotation-list {
+  list-style-type: none;
+  padding: 0;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.annotation-list-item {
+  background: #3a3a3a;
+  padding: 8px;
+  border-radius: 3px;
+  margin-bottom: 5px;
+  cursor: pointer;
+  font-size: 12px;
+  border-left: 4px solid #007acc;
+}
+.annotation-list-item:hover {
+  background: #555;
+}
+.annotation-list-item.selected {
+  background: #007acc;
+  color: white;
+}
+
+/* Buttons */
+.btn {
+  padding: 10px 16px;
+  border: 1px solid #666;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s;
+  background: #5a5a5a;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.btn:hover {
+  background: #6b6b6b;
+  border-color: #777;
+}
+.btn:disabled {
+  background: #444;
+  color: #888;
+  cursor: not-allowed;
+}
+.btn-success {
+  background: #28a745;
+  border-color: #34ce57;
+}
+.btn-success:hover {
+  background: #34ce57;
+}
+.btn-danger {
+  background: #dc3545;
+  border-color: #e74c3c;
+}
+.btn-danger:hover {
+  background: #e74c3c;
+}
+
+/* Status Bar */
+.status-bar {
+  background: #3c3c3c;
+  border-top: 1px solid #555;
+  padding: 6px 16px;
+  font-size: 12px;
+  color: #cccccc;
+  display: flex;
+  gap: 20px;
+}
+
+/* Indicators */
+.drawing-indicator {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 122, 204, 0.9);
+  color: white;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  display: none;
+  z-index: 100;
+}
+.drawing-indicator.active {
+  display: block;
+}
