@@ -31,25 +31,24 @@ fs.ensureDirSync(OUTPUT_DIR);
 // In-memory storage for annotations
 const annotationsStore = new Map();
 
-// --- NEW HELPER FUNCTION TO DRAW BOXES ON IMAGE ---
+// --- UPDATED HELPER FUNCTION TO DRAW BOXES ON IMAGE ---
 /**
- * Draws bounding boxes on an image and saves it to the output directory.
+ * Draws bounding boxes on an image and saves it to the output directory
+ * with the SAME name as the original, overwriting if it exists.
  * @param {string} filename The original image filename.
  * @param {Array} annotations An array of annotation objects.
  */
 async function drawAnnotationsOnImage(filename, annotations) {
   try {
     const inputImagePath = path.join(INPUT_DIR, filename);
-    const outputImageName = `annotated_${filename}`;
-    const outputImagePath = path.join(OUTPUT_DIR, outputImageName);
+    // --- CHANGE 1: Output filename is now the same as the input filename.
+    const outputImagePath = path.join(OUTPUT_DIR, filename);
 
-    // Create an array of SVG overlay operations for sharp
     const overlays = annotations.map((ann) => {
-      // Ensure width and height are positive integers
       const width = Math.max(1, Math.round(ann.width));
       const height = Math.max(1, Math.round(ann.height));
 
-      // Create an SVG for a semi-transparent blue box with a solid border
+      // --- CHANGE 2: Changed the fill color to be a solid, opaque blue.
       const svgBox = `
                 <svg width="${width}" height="${height}">
                     <rect
@@ -57,9 +56,9 @@ async function drawAnnotationsOnImage(filename, annotations) {
                         y="0"
                         width="${width}"
                         height="${height}"
-                        stroke="#007bff"
+                        stroke="#0056b3" 
                         stroke-width="3"
-                        fill="rgba(0, 123, 255, 0.3)" 
+                        fill="#007bff" 
                     />
                 </svg>
             `;
@@ -74,10 +73,10 @@ async function drawAnnotationsOnImage(filename, annotations) {
     // Use sharp to composite the overlays onto the original image
     await sharp(inputImagePath)
       .composite(overlays)
-      .toFormat("jpeg", { quality: 90 }) // Save as JPEG with 90% quality
+      .toFormat("jpeg", { quality: 90 })
       .toFile(outputImagePath);
 
-    console.log(`Successfully created annotated image: ${outputImageName}`);
+    console.log(`Successfully created/overwrote annotated image: ${filename}`);
   } catch (error) {
     console.error("Error creating annotated image:", error);
   }
@@ -89,7 +88,7 @@ function generateCocoFormat(imageData, annotations) {
     images: [
       {
         id: 1,
-        file_name: imageData.filename,
+        file_name: imageData.filename, // This now correctly matches the output image name
         width: imageData.width,
         height: imageData.height,
       },
@@ -125,7 +124,7 @@ async function getImageDimensions(imagePath) {
   }
 }
 
-// API Routes
+// API Routes (No changes needed in the routes themselves)
 
 app.get("/api/images", async (req, res) => {
   try {
@@ -189,7 +188,6 @@ app.get("/api/annotations/:filename", async (req, res) => {
   }
 });
 
-// --- UPDATED ROUTE ---
 app.post("/api/annotations/:filename", async (req, res) => {
   const filename = req.params.filename;
   const { annotations, imageData } = req.body;
@@ -199,21 +197,17 @@ app.post("/api/annotations/:filename", async (req, res) => {
   }
 
   try {
-    // 1. Generate and save COCO JSON file
     const cocoData = generateCocoFormat(imageData, annotations);
     const annotationPath = path.join(OUTPUT_DIR, `${filename}.json`);
     await fs.writeJson(annotationPath, cocoData, { spaces: 2 });
     console.log(`Annotations saved to ${filename}.json`);
 
-    // 2. Generate and save the image with boxes drawn on it
     if (annotations.length > 0) {
       await drawAnnotationsOnImage(filename, annotations);
     }
 
-    // 3. Store in memory for real-time updates
     annotationsStore.set(filename, annotations);
 
-    // 4. Emit to all connected clients
     io.emit("annotation:updated", {
       filename,
       annotations,
@@ -278,7 +272,7 @@ app.use((error, req, res, next) => {
 });
 
 // Start server
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Input directory: ${INPUT_DIR}`);

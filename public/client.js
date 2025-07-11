@@ -87,6 +87,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
       canvas.setWidth(currentImage.width);
       canvas.setHeight(currentImage.height);
+
+      // Reset viewport transform to default state
+      canvas.viewportTransform = [1, 0, 0, 1, 0, 0];
+      canvas.setZoom(1);
+
       canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas), {
         originX: "left",
         originY: "top",
@@ -108,6 +113,39 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  function zoomToFit() {
+    if (!currentImage.filename) return;
+
+    const viewportWidth = canvasViewport.clientWidth;
+    const viewportHeight = canvasViewport.clientHeight;
+    const imageWidth = currentImage.width;
+    const imageHeight = currentImage.height;
+
+    // Calculate scale to fit the image within the viewport
+    const scaleX = viewportWidth / imageWidth;
+    const scaleY = viewportHeight / imageHeight;
+    const scale = Math.min(scaleX, scaleY) * 0.95; // 95% for padding
+
+    // Set zoom level
+    canvas.setZoom(scale);
+
+    // Calculate center position
+    const scaledWidth = imageWidth * scale;
+    const scaledHeight = imageHeight * scale;
+    const centerX = (viewportWidth - scaledWidth) / 2;
+    const centerY = (viewportHeight - scaledHeight) / 2;
+
+    // Apply centering transform
+    canvas.viewportTransform[4] = centerX;
+    canvas.viewportTransform[5] = centerY;
+
+    // Update zoom display
+    const percentage = Math.round(scale * 100);
+    zoomLevelDisplay.textContent = `${percentage}%`;
+    statusZoom.textContent = `${percentage}%`;
+
+    canvas.renderAll();
+  }
   async function saveAnnotations() {
     if (!currentImage.filename) return;
 
@@ -307,6 +345,238 @@ document.addEventListener("DOMContentLoaded", () => {
     canvas.viewportTransform[5] = 0;
     canvas.requestRenderAll();
   });
+
+  // Add these variables to your STATE MANAGEMENT section
+  let isSpacebarPressed = false;
+  let isSpacebarPanning = false;
+  let lastSpacebarPanPoint = null;
+  let previousCursor = null;
+  let previousTool = null;
+
+  // Enhanced keyboard event handlers
+  document.addEventListener("keydown", (e) => {
+    if (document.activeElement.tagName === "INPUT") return;
+
+    // Handle spacebar for temporary pan mode
+    if (e.code === "Space" && !isSpacebarPressed) {
+      e.preventDefault();
+      isSpacebarPressed = true;
+
+      // Store current state
+      previousCursor = canvas.defaultCursor;
+      previousTool = currentTool;
+
+      // Switch to temporary pan mode
+      canvas.defaultCursor = "grab";
+      canvas.setCursor("grab");
+      canvas.selection = false;
+
+      // Disable object selection temporarily
+      canvas.forEachObject((obj) => {
+        if (obj.type === "rect") {
+          obj.selectable = false;
+          obj.evented = false;
+        }
+      });
+
+      canvas.renderAll();
+      return;
+    }
+
+    // Other keyboard shortcuts (only if spacebar is not pressed)
+    if (!isSpacebarPressed) {
+      switch (e.key.toLowerCase()) {
+        case "v":
+          selectToolMode("select");
+          break;
+        case "b":
+          selectToolMode("box");
+          break;
+        case "h":
+          selectToolMode("pan");
+          break;
+        case "delete":
+        case "backspace":
+          deleteBtn.click();
+          break;
+        case "escape":
+          if (isDrawingMode) {
+            exitDrawingMode();
+            selectToolMode("select");
+          }
+          break;
+      }
+    }
+  });
+
+  document.addEventListener("keyup", (e) => {
+    if (e.code === "Space" && isSpacebarPressed) {
+      e.preventDefault();
+      isSpacebarPressed = false;
+      isSpacebarPanning = false;
+      lastSpacebarPanPoint = null;
+
+      // Restore previous state
+      canvas.defaultCursor = previousCursor || "default";
+      canvas.setCursor(previousCursor || "default");
+
+      // Restore tool mode
+      if (previousTool) {
+        selectToolMode(previousTool);
+      }
+
+      // Clear stored state
+      previousCursor = null;
+      previousTool = null;
+
+      canvas.renderAll();
+    }
+  });
+
+  // Enhanced canvas mouse event handlers
+  canvas.on("mouse:down", (opt) => {
+    const e = opt.e;
+
+    // Handle spacebar panning
+    if (isSpacebarPressed) {
+      isSpacebarPanning = true;
+      lastSpacebarPanPoint = { x: e.clientX, y: e.clientY };
+      canvas.setCursor("grabbing");
+      return;
+    }
+
+    // Original mouse down logic
+    if (currentTool === "pan") {
+      isPanning = true;
+      lastPanPoint = { x: e.clientX, y: e.clientY };
+      canvas.setCursor("grabbing");
+    } else if (isDrawingMode && currentTool === "box") {
+      firstPoint = canvas.getPointer(e);
+      previewRect = createRect({
+        left: firstPoint.x,
+        top: firstPoint.y,
+        width: 0,
+        height: 0,
+      });
+      previewRect.set({ isPreview: true, strokeDashArray: [5, 5] });
+    }
+  });
+
+  canvas.on("mouse:move", (opt) => {
+    const e = opt.e;
+
+    // Handle spacebar panning
+    if (isSpacebarPanning && lastSpacebarPanPoint) {
+      canvas.relativePan({
+        x: e.clientX - lastSpacebarPanPoint.x,
+        y: e.clientY - lastSpacebarPanPoint.y,
+      });
+      lastSpacebarPanPoint = { x: e.clientX, y: e.clientY };
+      return;
+    }
+
+    // Original mouse move logic
+    if (isPanning) {
+      canvas.relativePan({
+        x: e.clientX - lastPanPoint.x,
+        y: e.clientY - lastPanPoint.y,
+      });
+      lastPanPoint = { x: e.clientX, y: e.clientY };
+    } else if (isDrawingMode && previewRect) {
+      const pointer = canvas.getPointer(e);
+      const width = pointer.x - firstPoint.x;
+      const height = pointer.y - firstPoint.y;
+      previewRect.set({
+        width: Math.abs(width),
+        height: Math.abs(height),
+        left: width > 0 ? firstPoint.x : pointer.x,
+        top: height > 0 ? firstPoint.y : pointer.y,
+      });
+      canvas.renderAll();
+    }
+  });
+
+  canvas.on("mouse:up", () => {
+    // Handle spacebar panning
+    if (isSpacebarPanning) {
+      isSpacebarPanning = false;
+      canvas.setCursor("grab");
+      return;
+    }
+
+    // Original mouse up logic
+    if (isPanning) {
+      isPanning = false;
+      canvas.setCursor("grab");
+    }
+
+    if (isDrawingMode && previewRect) {
+      if (previewRect.width > 5 && previewRect.height > 5) {
+        const finalRect = createRect({
+          left: previewRect.left,
+          top: previewRect.top,
+          width: previewRect.width,
+          height: previewRect.height,
+        });
+        socket.emit("annotation:create", {
+          filename: currentImage.filename,
+          annotation: {
+            id: finalRect.id,
+            left: finalRect.left,
+            top: finalRect.top,
+            width: finalRect.width,
+            height: finalRect.height,
+          },
+        });
+        updateStatus();
+      }
+      exitDrawingMode();
+      selectToolMode("select");
+    }
+  });
+
+  // Enhanced selectToolMode function to work with spacebar
+  function selectToolMode(tool) {
+    // Don't change tools if spacebar is pressed
+    if (isSpacebarPressed) {
+      return;
+    }
+
+    exitDrawingMode();
+
+    currentTool = tool;
+    [selectToolBtn, boxToolBtn, panToolBtn].forEach((btn) =>
+      btn.classList.remove("active"),
+    );
+    document.getElementById(tool + "Tool").classList.add("active");
+
+    canvas.isDrawingMode = false;
+
+    if (tool === "select") {
+      canvas.selection = true;
+      canvas.defaultCursor = "default";
+      canvas.forEachObject((obj) => {
+        if (obj.type === "rect") {
+          obj.selectable = true;
+          obj.evented = true;
+        }
+      });
+    } else if (tool === "pan") {
+      canvas.selection = false;
+      canvas.defaultCursor = "grab";
+    } else if (tool === "box") {
+      canvas.selection = false;
+      canvas.defaultCursor = "crosshair";
+      canvas.forEachObject((obj) => {
+        if (obj.type === "rect") {
+          obj.selectable = false;
+          obj.evented = false;
+        }
+      });
+      startDrawingMode();
+    }
+    canvas.renderAll();
+  }
 
   clearBtn.addEventListener("click", () => {
     if (confirm("Are you sure you want to delete all boxes on this image?")) {
