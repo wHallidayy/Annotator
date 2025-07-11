@@ -73,6 +73,23 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  // Function สำหรับจัดกึ่งกลางภาพ (เหมือนปุ่ม Zoom Actual)
+  function centerImageActualSize() {
+    if (!currentImage.filename) return;
+
+    canvas.setZoom(1);
+    canvas.viewportTransform[4] =
+      (canvasViewport.clientWidth - currentImage.width) / 2;
+    canvas.viewportTransform[5] =
+      (canvasViewport.clientHeight - currentImage.height) / 2;
+
+    const percentage = Math.round(1 * 100);
+    zoomLevelDisplay.textContent = `${percentage}%`;
+    statusZoom.textContent = `${percentage}%`;
+
+    canvas.renderAll();
+  }
+
   async function loadCanvasImage(filename) {
     if (currentImage.filename === filename) return;
 
@@ -108,7 +125,8 @@ document.addEventListener("DOMContentLoaded", () => {
       socket.emit("request:annotations", filename);
 
       updateStatus();
-      zoomToFit();
+      // เรียก function จัดกึ่งกลางแทน zoomToFit
+      centerImageActualSize();
       selectToolMode("select"); // Default to select tool on new image
     });
   }
@@ -310,24 +328,6 @@ document.addEventListener("DOMContentLoaded", () => {
     canvas.renderAll();
   }
 
-  function zoomToFit() {
-    if (!currentImage.filename) return;
-    const scale = Math.min(
-      canvasViewport.clientWidth / currentImage.width,
-      canvasViewport.clientHeight / currentImage.height,
-    );
-    const newZoom = scale * 0.95; // 95% for padding
-    canvas.setZoom(newZoom);
-    canvas.viewportTransform[4] =
-      (canvasViewport.clientWidth - currentImage.width * newZoom) / 2;
-    canvas.viewportTransform[5] =
-      (canvasViewport.clientHeight - currentImage.height * newZoom) / 2;
-    const percentage = Math.round(newZoom * 100);
-    zoomLevelDisplay.textContent = `${percentage}%`;
-    statusZoom.textContent = `${percentage}%`;
-    canvas.renderAll();
-  }
-
   // --- EVENT LISTENERS ---
   saveBtn.addEventListener("click", saveAnnotations);
   selectToolBtn.addEventListener("click", () => selectToolMode("select"));
@@ -339,12 +339,7 @@ document.addEventListener("DOMContentLoaded", () => {
     updateZoom(canvas.getZoom() / 1.2),
   );
   zoomFitBtn.addEventListener("click", zoomToFit);
-  zoomActualBtn.addEventListener("click", () => {
-    updateZoom(1);
-    canvas.viewportTransform[4] = 0;
-    canvas.viewportTransform[5] = 0;
-    canvas.requestRenderAll();
-  });
+  zoomActualBtn.addEventListener("click", centerImageActualSize);
 
   // Add these variables to your STATE MANAGEMENT section
   let isSpacebarPressed = false;
@@ -484,13 +479,21 @@ document.addEventListener("DOMContentLoaded", () => {
       lastPanPoint = { x: e.clientX, y: e.clientY };
     } else if (isDrawingMode && previewRect) {
       const pointer = canvas.getPointer(e);
-      const width = pointer.x - firstPoint.x;
-      const height = pointer.y - firstPoint.y;
+      const deltaX = pointer.x - firstPoint.x;
+      const deltaY = pointer.y - firstPoint.y;
+
+      // บังคับให้เป็นสี่เหลี่ยมจัตุรัส โดยใช้ค่าที่มากกว่า
+      const size = Math.max(Math.abs(deltaX), Math.abs(deltaY));
+
+      // กำหนดทิศทางของการวาด
+      const left = deltaX >= 0 ? firstPoint.x : firstPoint.x - size;
+      const top = deltaY >= 0 ? firstPoint.y : firstPoint.y - size;
+
       previewRect.set({
-        width: Math.abs(width),
-        height: Math.abs(height),
-        left: width > 0 ? firstPoint.x : pointer.x,
-        top: height > 0 ? firstPoint.y : pointer.y,
+        width: size,
+        height: size,
+        left: left,
+        top: top,
       });
       canvas.renderAll();
     }
@@ -611,107 +614,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  document.addEventListener("keydown", (e) => {
-    if (document.activeElement.tagName === "INPUT") return;
-    switch (e.key.toLowerCase()) {
-      case "v":
-        selectToolMode("select");
-        break;
-      case "b":
-        selectToolMode("box");
-        break;
-      case "h":
-        selectToolMode("pan");
-        break;
-      case "delete":
-      case "backspace":
-        deleteBtn.click();
-        break;
-      case "escape":
-        if (isDrawingMode) {
-          exitDrawingMode();
-          selectToolMode("select");
-        }
-        break;
-    }
-  });
-
-  // --- CANVAS EVENT LISTENERS ---
-
-  canvas.on("mouse:down", (opt) => {
-    const e = opt.e;
-    if (currentTool === "pan") {
-      isPanning = true;
-      lastPanPoint = { x: e.clientX, y: e.clientY };
-      canvas.setCursor("grabbing");
-    } else if (isDrawingMode && currentTool === "box") {
-      firstPoint = canvas.getPointer(e);
-      previewRect = createRect({
-        left: firstPoint.x,
-        top: firstPoint.y,
-        width: 0,
-        height: 0,
-      });
-      previewRect.set({ isPreview: true, strokeDashArray: [5, 5] });
-    }
-  });
-
-  canvas.on("mouse:move", (opt) => {
-    const e = opt.e;
-    if (isPanning) {
-      canvas.relativePan({
-        x: e.clientX - lastPanPoint.x,
-        y: e.clientY - lastPanPoint.y,
-      });
-      lastPanPoint = { x: e.clientX, y: e.clientY };
-    } else if (isDrawingMode && previewRect) {
-      const pointer = canvas.getPointer(e);
-      const width = pointer.x - firstPoint.x;
-      const height = pointer.y - firstPoint.y;
-      previewRect.set({
-        width: Math.abs(width),
-        height: Math.abs(height),
-        left: width > 0 ? firstPoint.x : pointer.x,
-        top: height > 0 ? firstPoint.y : pointer.y,
-      });
-      canvas.renderAll();
-    }
-  });
-
-  canvas.on("mouse:up", () => {
-    if (isPanning) {
-      isPanning = false;
-      canvas.setCursor("grab");
-    }
-
-    // --- FIX ---
-    // Moved the tool-switching logic here. This is the correct place.
-    if (isDrawingMode && previewRect) {
-      if (previewRect.width > 5 && previewRect.height > 5) {
-        const finalRect = createRect({
-          left: previewRect.left,
-          top: previewRect.top,
-          width: previewRect.width,
-          height: previewRect.height,
-        });
-        socket.emit("annotation:create", {
-          filename: currentImage.filename,
-          annotation: {
-            id: finalRect.id,
-            left: finalRect.left,
-            top: finalRect.top,
-            width: finalRect.width,
-            height: finalRect.height,
-          },
-        });
-        updateStatus();
-      }
-      // Now that drawing is finished, exit the mode and switch back to select.
-      exitDrawingMode();
-      selectToolMode("select");
-    }
-  });
-
   canvas.on("mouse:wheel", (opt) => {
     opt.e.preventDefault();
     opt.e.stopPropagation();
@@ -750,6 +652,64 @@ document.addEventListener("DOMContentLoaded", () => {
       updateStatus();
     }
   });
+
+  // เพิ่ม event handler สำหรับการปรับขนาด box ให้เป็นสี่เหลี่ยมจัตุรัส
+  // เพิ่มโค้ดนี้ใน client.js หลังจาก canvas.on("object:modified", ...)
+
+  canvas.on("object:scaling", (opt) => {
+    const target = opt.target;
+    if (target.type === "rect" && !target.isPreview) {
+      // คำนวณขนาดใหม่โดยใช้ค่าที่ใหญ่กว่าระหว่าง scaleX และ scaleY
+      const maxScale = Math.max(target.scaleX, target.scaleY);
+
+      // บังคับให้ scale ทั้งสองแกนเท่ากัน
+      target.set({
+        scaleX: maxScale,
+        scaleY: maxScale,
+      });
+
+      canvas.renderAll();
+    }
+  });
+
+  // หรือถ้าต้องการให้ box คงสัดส่วนสี่เหลี่ยมจัตุรัสตั้งแต่ตอนสร้าง
+  // แก้ไขฟังก์ชัน createRect ให้รองรับการล็อกสัดส่วน
+  function createRect(options) {
+    const rect = new fabric.Rect({
+      left: options.left,
+      top: options.top,
+      width: options.width,
+      height: options.height,
+      fill: `${fillColorInput.value}80`,
+      stroke: strokeColorInput.value,
+      strokeWidth: 2,
+      id: options.id || Date.now(),
+      selectable: currentTool === "select",
+      evented: currentTool === "select",
+      transparentCorners: false,
+      cornerColor: "#ffffff",
+      cornerStrokeColor: "#000000",
+      cornerStyle: "circle",
+      cornerSize: 10,
+      // เพิ่ม properties เหล่านี้เพื่อควบคุมการปรับขนาด
+      lockUniScaling: true, // ล็อกให้ scale แบบสมส่วน
+      centeredScaling: false, // ไม่ให้ scale จากจุดกึ่งกลาง
+      centeredRotation: false, // ไม่ให้หมุนจากจุดกึ่งกลาง
+    });
+
+    // เพิ่ม event listener เฉพาะสำหรับ rect นี้
+    rect.on("scaling", function () {
+      // บังคับให้เป็นสี่เหลี่ยมจัตุรัสเสมอ
+      const maxScale = Math.max(this.scaleX, this.scaleY);
+      this.set({
+        scaleX: maxScale,
+        scaleY: maxScale,
+      });
+    });
+
+    canvas.add(rect);
+    return rect;
+  }
 
   canvas.on("selection:created", updateAnnotationList);
   canvas.on("selection:updated", updateAnnotationList);
