@@ -58,7 +58,7 @@ async function drawAnnotationsOnImage(filename, annotations) {
                         height="${height}"
                         stroke="#0056b3" 
                         stroke-width="3"
-                        fill="#007bff" 
+                        fill="#007bff"
                     />
                 </svg>
             `;
