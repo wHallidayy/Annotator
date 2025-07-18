@@ -72,22 +72,41 @@ document.addEventListener("DOMContentLoaded", () => {
       galleryContainer.innerHTML = "<p>Error loading images.</p>";
     }
   }
-
-  // Function สำหรับจัดกึ่งกลางภาพ (เหมือนปุ่ม Zoom Actual)
+  // ----------  ZOOM-TO-FIT & CENTER  ----------
   function centerImageActualSize() {
+    // simply set 1:1 zoom and center
+    if (!currentImage.filename) return;
+    canvas.setZoom(1);
+    const vp = canvasViewport.getBoundingClientRect();
+    canvas.absolutePan({
+      x: (currentImage.width - vp.width) / 2,
+      y: (currentImage.height - vp.height) / 2,
+    });
+    updateZoomDisplay(1);
+  }
+
+  function zoomToFit() {
     if (!currentImage.filename) return;
 
-    canvas.setZoom(1);
-    canvas.viewportTransform[4] =
-      (canvasViewport.clientWidth - currentImage.width) / 2;
-    canvas.viewportTransform[5] =
-      (canvasViewport.clientHeight - currentImage.height) / 2;
+    const vp = canvasViewport.getBoundingClientRect();
+    const scaleX = vp.width / currentImage.width;
+    const scaleY = vp.height / currentImage.height;
+    const scale = Math.min(scaleX, scaleY) * 0.95; // 5 % padding
 
-    const percentage = Math.round(1 * 100);
-    zoomLevelDisplay.textContent = `${percentage}%`;
-    statusZoom.textContent = `${percentage}%`;
+    // center the image
+    canvas.setZoom(scale);
+    canvas.absolutePan({
+      x: (currentImage.width * scale - vp.width) / 2,
+      y: (currentImage.height * scale - vp.height) / 2,
+    });
+    updateZoomDisplay(scale);
+  }
 
-    canvas.renderAll();
+  // helper to keep zoom-level labels in sync
+  function updateZoomDisplay(zoom) {
+    const pct = Math.round(zoom * 100);
+    zoomLevelDisplay.textContent = `${pct}%`;
+    statusZoom.textContent = `${pct}%`;
   }
 
   async function loadCanvasImage(filename) {
@@ -131,39 +150,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  function zoomToFit() {
-    if (!currentImage.filename) return;
-
-    const viewportWidth = canvasViewport.clientWidth;
-    const viewportHeight = canvasViewport.clientHeight;
-    const imageWidth = currentImage.width;
-    const imageHeight = currentImage.height;
-
-    // Calculate scale to fit the image within the viewport
-    const scaleX = viewportWidth / imageWidth;
-    const scaleY = viewportHeight / imageHeight;
-    const scale = Math.min(scaleX, scaleY) * 0.95; // 95% for padding
-
-    // Set zoom level
-    canvas.setZoom(scale);
-
-    // Calculate center position
-    const scaledWidth = imageWidth * scale;
-    const scaledHeight = imageHeight * scale;
-    const centerX = (viewportWidth - scaledWidth) / 2;
-    const centerY = (viewportHeight - scaledHeight) / 2;
-
-    // Apply centering transform
-    canvas.viewportTransform[4] = centerX;
-    canvas.viewportTransform[5] = centerY;
-
-    // Update zoom display
-    const percentage = Math.round(scale * 100);
-    zoomLevelDisplay.textContent = `${percentage}%`;
-    statusZoom.textContent = `${percentage}%`;
-
-    canvas.renderAll();
-  }
   async function saveAnnotations() {
     if (!currentImage.filename) return;
 
@@ -347,10 +333,63 @@ document.addEventListener("DOMContentLoaded", () => {
   let lastSpacebarPanPoint = null;
   let previousCursor = null;
   let previousTool = null;
+  let isCKeyToggled = false;
+  let isCKeyPanning = false;
+  let lastCKeyPanPoint = null;
 
   // Enhanced keyboard event handlers
   document.addEventListener("keydown", (e) => {
     if (document.activeElement.tagName === "INPUT") return;
+
+    // Handle 'c' key to toggle drag mode
+    if (e.key.toLowerCase() === "c") {
+      e.preventDefault();
+      
+      if (!isCKeyToggled) {
+        // Turn on drag mode
+        isCKeyToggled = true;
+        
+        // Store current state
+        previousCursor = canvas.defaultCursor;
+        previousTool = currentTool;
+
+        // Switch to drag mode
+        canvas.defaultCursor = "grab";
+        canvas.setCursor("grab");
+        canvas.selection = false;
+
+        // Disable object selection temporarily
+        canvas.forEachObject((obj) => {
+          if (obj.type === "rect") {
+            obj.selectable = false;
+            obj.evented = false;
+          }
+        });
+
+        canvas.renderAll();
+      } else {
+        // Turn off drag mode
+        isCKeyToggled = false;
+        isCKeyPanning = false;
+        lastCKeyPanPoint = null;
+
+        // Restore previous state
+        canvas.defaultCursor = previousCursor || "default";
+        canvas.setCursor(previousCursor || "default");
+
+        // Restore tool mode
+        if (previousTool) {
+          selectToolMode(previousTool);
+        }
+
+        // Clear stored state
+        previousCursor = null;
+        previousTool = null;
+
+        canvas.renderAll();
+      }
+      return;
+    }
 
     // Handle spacebar for temporary pan mode
     if (e.code === "Space" && !isSpacebarPressed) {
@@ -378,8 +417,8 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    // Other keyboard shortcuts (only if spacebar is not pressed)
-    if (!isSpacebarPressed) {
+    // Other keyboard shortcuts (only if spacebar is not pressed and c key is not toggled)
+    if (!isSpacebarPressed && !isCKeyToggled) {
       switch (e.key.toLowerCase()) {
         case "v":
           selectToolMode("select");
@@ -432,6 +471,14 @@ document.addEventListener("DOMContentLoaded", () => {
   canvas.on("mouse:down", (opt) => {
     const e = opt.e;
 
+    // Handle 'c' key toggle drag mode
+    if (isCKeyToggled) {
+      isCKeyPanning = true;
+      lastCKeyPanPoint = { x: e.clientX, y: e.clientY };
+      canvas.setCursor("grabbing");
+      return;
+    }
+
     // Handle spacebar panning
     if (isSpacebarPressed) {
       isSpacebarPanning = true;
@@ -459,6 +506,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
   canvas.on("mouse:move", (opt) => {
     const e = opt.e;
+
+    // Handle 'c' key toggle drag mode
+    if (isCKeyPanning && lastCKeyPanPoint) {
+      canvas.relativePan({
+        x: e.clientX - lastCKeyPanPoint.x,
+        y: e.clientY - lastCKeyPanPoint.y,
+      });
+      lastCKeyPanPoint = { x: e.clientX, y: e.clientY };
+      return;
+    }
 
     // Handle spacebar panning
     if (isSpacebarPanning && lastSpacebarPanPoint) {
@@ -500,6 +557,13 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   canvas.on("mouse:up", () => {
+    // Handle 'c' key toggle drag mode
+    if (isCKeyPanning) {
+      isCKeyPanning = false;
+      canvas.setCursor("grab");
+      return;
+    }
+
     // Handle spacebar panning
     if (isSpacebarPanning) {
       isSpacebarPanning = false;
@@ -538,10 +602,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // Enhanced selectToolMode function to work with spacebar
+  // Enhanced selectToolMode function to work with spacebar and 'c' key toggle
   function selectToolMode(tool) {
-    // Don't change tools if spacebar is pressed
-    if (isSpacebarPressed) {
+    // Don't change tools if spacebar is pressed or 'c' key is toggled
+    if (isSpacebarPressed || isCKeyToggled) {
       return;
     }
 
@@ -620,8 +684,14 @@ document.addEventListener("DOMContentLoaded", () => {
     const delta = opt.e.deltaY;
     let zoom = canvas.getZoom();
     zoom *= 0.999 ** delta;
-    if (zoom > 20) zoom = 20;
-    if (zoom < 0.01) zoom = 0.01;
+    
+    // คำนวณการจำกัดการซูมตามขนาดของ canvas
+    const maxZoom = Math.max(50, Math.min(currentImage.width, currentImage.height) / 10);
+    const minZoom = Math.max(0.01, Math.min(800 / currentImage.width, 600 / currentImage.height) * 0.1);
+    
+    if (zoom > maxZoom) zoom = maxZoom;
+    if (zoom < minZoom) zoom = minZoom;
+    
     canvas.zoomToPoint({ x: opt.e.offsetX, y: opt.e.offsetY }, zoom);
     const percentage = Math.round(zoom * 100);
     zoomLevelDisplay.textContent = `${percentage}%`;
